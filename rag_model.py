@@ -1,0 +1,216 @@
+import os
+import sys
+
+# --- 1. Load API Key from .env file ---
+try:
+    from dotenv import load_dotenv
+    # This will find the .env file in your RAG_MODEL folder
+    load_dotenv() 
+except ImportError:
+    print("Error: 'python-dotenv' library not found.")
+    print("Please run: pip install python-dotenv")
+    sys.exit()
+
+# --- 2. Import required libraries ---
+try:
+    from groq import Groq  # <-- Native Groq client
+    from langchain_community.document_loaders import TextLoader
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    from langchain_community.vectorstores import FAISS
+except ImportError:
+    print("Error: Required libraries not found.")
+    print("Please run: pip install -U groq langchain-community langchain-text-splitters faiss-cpu sentence-transformers")
+    sys.exit()
+
+# --- 3. Load the API Key and Initialize Groq Client ---
+API_KEY = os.getenv("GROQ_API_KEY")
+
+if not API_KEY:
+    print("Error: GROQ_API_KEY not found.")
+    print("Please make sure your API key is in the .env file (e.g., GROQ_API_KEY=your_key_here)")
+    sys.exit()
+
+# Initialize the native Groq client
+client = Groq(api_key=API_KEY)
+# We will use a fast Llama 3 model
+GROQ_MODEL = "openai/gpt-oss-20b"
+
+# --- 4. Set File and Index Paths ---
+DOC_PATH = "docs/feroze.txt"
+INDEX_PATH = "feroze_faiss_index"
+
+
+
+# --- 7. RAG Prompt Template (as a simple string) ---
+# This is the instruction manual for the LLM
+
+template = """
+You are the AI Avatar for Feroze Azeez, a top financial expert in India and CEO of Anand Rathi Wealth.
+You must answer on his behalf, exactly like him.
+
+Your job is to answer questions using his exact investment philosophy, advice, and tone.
+The answer must be direct, confident, and logic-driven.
+
+Use the provided 'Context' (Feroze's knowledge) to form your answer.
+
+PREVIOUS CONVERSATION:
+{chat_history}
+
+Context:
+{context}
+
+Question:
+{question}
+
+Answer (as Feroze Azeez):
+"""
+
+
+# =======================================================
+## FUNCTION 1: Knowledge Base Loading (FastAPI will call this once)
+# =======================================================
+def load_knowledge_base():
+    """Builds or loads the FAISS index and returns the retriever object."""
+    print("Loading Embedding Model (all-MiniLM-L6-v2)...")
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+    # The logic below is directly from your original code block 5
+    if os.path.exists(INDEX_PATH):
+        # If index exists, load it
+        print(f"Loading existing Knowledge Base from '{INDEX_PATH}'...")
+        db = FAISS.load_local(
+            INDEX_PATH, 
+            embeddings, 
+            allow_dangerous_deserialization=True
+        )
+        print("Knowledge Base loaded successfully.")
+    else:
+        # If index doesn't exist, build a new one
+        print(f"Knowledge Base not found. Building new one from '{DOC_PATH}'...")
+        
+        if not os.path.exists(DOC_PATH):
+            raise FileNotFoundError(f"Error: Document file not found at '{DOC_PATH}'.")
+
+        # 1. Load
+        loader = TextLoader(DOC_PATH, encoding="utf-8")
+        documents = loader.load()
+        print(f"Documents from '{DOC_PATH}' loaded.")
+        
+        # 2. Split
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        docs = text_splitter.split_documents(documents)
+        print(f"Documents split into {len(docs)} chunks.")
+        
+        # 3. Store
+        print("Creating vector database (FAISS)... This may take a moment.")
+        db = FAISS.from_documents(docs, embeddings)
+        
+        # 4. Save
+        db.save_local(INDEX_PATH)
+        print(f"Knowledge Base built and saved to '{INDEX_PATH}'.")
+
+    # Create the Retriever and return it
+    return db.as_retriever(search_kwargs={"k": 3})
+
+
+# =======================================================
+## FUNCTION 2: Response Generation (FastAPI will call this per message)
+# =======================================================
+def get_feroze_response(user_question: str, retriever, chat_history_str: str) -> str:
+    """Retrieves context and generates the AI response using Groq."""
+    
+    # Check for empty question
+    if not user_question:
+        return "Please ask a valid question."
+        
+    # --- This is the new RAG logic (from your original code block 8) ---
+
+    # 1. Retrieve: Get relevant documents from FAISS
+    retrieved_docs = retriever.invoke(user_question)
+    
+    # Format the context string
+    context_string = "\n\n".join([doc.page_content for doc in retrieved_docs])
+
+    # 2. Prepare Prompt: Fill the template with context and question
+    final_prompt = template.format(chat_history=chat_history_str,context=context_string, question=user_question)
+
+    # 3. Generate: Call Groq API
+    try:
+        completion = client.chat.completions.create(
+            model=GROQ_MODEL, # Corrected model used here
+            messages=[
+                {
+                    "role": "user",
+                    "content": final_prompt
+                }
+            ],
+            temperature=0.7, 
+            max_tokens=8192,
+            top_p=1,
+            stream=False, # Changed to False for API response compatibility
+            stop=None,
+        )
+
+        # Return the final content (no streaming print needed)
+        return completion.choices[0].message.content
+        
+    except Exception as e:
+        # Better error reporting for the server
+        print(f"\nGroq API An error occurred: {e}")
+        return "An internal error occurred while generating the AI response."
+
+
+
+# # --- 8. Start the Chat Loop ---
+# print(f"\n--- Feroze Azeez AI (Powered by Groq {GROQ_MODEL}) is ready ---")
+# print("Ask a question (or type 'quit' to exit):")
+
+# while True:
+#     try:
+#         user_question = input("\nWhat would you like to ask?: ")
+#         if user_question.lower() in ['quit', 'exit', 'bye']:
+#             print("Shutting down the AI assistant. Goodbye!")
+#             break
+        
+#         if not user_question:
+#             continue
+
+#         print("\nFeroze AI is thinking (with Groq)...")
+
+#         # --- This is the new RAG logic ---
+
+#         # 1. Retrieve: Get relevant documents from FAISS
+#         retrieved_docs = retriever.invoke(user_question)
+        
+#         # Format the context string
+#         context_string = "\n\n".join([doc.page_content for doc in retrieved_docs])
+
+#         # 2. Prepare Prompt: Fill the template with context and question
+#         final_prompt = template.format(context=context_string, question=user_question)
+
+#         # 3. Generate: Call Groq API, just like your example
+#         completion = client.chat.completions.create(
+#             model=GROQ_MODEL,
+#             messages=[
+#                 {
+#                     "role": "user",
+#                     "content": final_prompt
+#                 }
+#             ],
+#             temperature=0.7, # A bit of creativity, but not too much
+#             max_tokens=8192,
+#             top_p=1,
+#             stream=True,
+#             stop=None,
+#         )
+
+#         print("\nFeroze AI's Answer:")
+#         # Stream the response
+#         for chunk in completion:
+#             print(chunk.choices[0].delta.content or "", end="")
+#         print() # Add a newline after the full response
+
+#     except Exception as e:
+#         print(f"\nAn error occurred: {e}")
+#         break

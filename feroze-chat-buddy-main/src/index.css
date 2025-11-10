@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 220 17% 97%;
+    --foreground: 220 15% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 15%;
+
+    --primary: 200 95% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 195 75% 92%;
+    --secondary-foreground: 200 95% 25%;
+
+    --muted: 195 30% 92%;
+    --muted-foreground: 220 15% 45%;
+
+    --accent: 195 85% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 200 95% 35%;
+
+    --radius: 1rem;
+
+    --chat-user-bg: 200 95% 35%;
+    --chat-user-fg: 0 0% 100%;
+    --chat-ai-bg: 0 0% 100%;
+    --chat-ai-fg: 220 15% 15%;
+    --chat-input-bg: 0 0% 100%;
+    
+    /* Akinator-inspired gradients and effects */
+    --gradient-akinator-bg: linear-gradient(135deg, hsl(210 100% 65%) 0%, hsl(200 100% 75%) 50%, hsl(195 100% 85%) 100%);
+    --gradient-title: linear-gradient(180deg, hsl(200 95% 35%) 0%, hsl(195 85% 45%) 100%);
+    --gradient-button: linear-gradient(135deg, hsl(200 95% 45%) 0%, hsl(195 85% 55%) 100%);
+    
+    --shadow-elegant: 0 4px 20px -2px hsl(200 95% 35% / 0.15);
+    --shadow-float: 0 20px 50px -10px hsl(200 95% 35% / 0.4);
+    --shadow-soft: 0 2px 8px -1px hsl(220 15% 15% / 0.08);
+    --shadow-avatar: 0 30px 60px -15px hsl(220 15% 15% / 0.3);
+  }
+
+  .dark {
+    --background: 220 20% 10%;
+    --foreground: 220 10% 95%;
+
+    --card: 220 18% 13%;
+    --card-foreground: 220 10% 95%;
+
+    --popover: 220 18% 13%;
+    --popover-foreground: 220 10% 95%;
+
+    --primary: 200 95% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 200 95% 70%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 65%;
+
+    --accent: 195 85% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 200 95% 50%;
+
+    --chat-user-bg: 200 95% 40%;
+    --chat-user-fg: 0 0% 100%;
+    --chat-ai-bg: 220 15% 18%;
+    --chat-ai-fg: 220 10% 95%;
+    --chat-input-bg: 220 15% 18%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(200 95% 40%) 0%, hsl(195 85% 50%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(220 20% 10%) 0%, hsl(220 18% 13%) 100%);
+
+    --shadow-elegant: 0 4px 20px -2px hsl(200 95% 50% / 0.25);
+    --shadow-soft: 0 2px 8px -1px hsl(0 0% 0% / 0.3);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
