@@ -358,13 +358,13 @@ async def consult_endpoint(
  
     print(f"--> Received question AND screenshot from: {current_user}")
 
-# 1. User ki puraani history nikaalein
+    # 1. User ki puraani history nikaalein
     user_history = chat_histories.get(current_user, [])
 
-# 2. History ko prompt ke liye format karein
+    # 2. History ko prompt ke liye format karein
     history_str = format_history_for_prompt(user_history)
 
-# 3. NAYE RAG function ko call karein (jo image bhi leta hai)
+    # 3. NAYE RAG function ko call karein (jo image bhi leta hai)
     try:
         response_text = get_consult_response(
             user_question, 
@@ -373,8 +373,8 @@ async def consult_endpoint(
             history_str
             )
     except Exception as e:
-     print(f"Error during vision consultation: {e}")
-     raise HTTPException(status_code=500, detail="Error processing image and question.")
+        print(f"Error during vision consultation: {e}")
+        raise HTTPException(status_code=500, detail="Error processing image and question.")
 
     # 4. Naye message ko history mein save karein
     user_history.append({"role": "user", "content": user_question})
