@@ -11,6 +11,12 @@ except ImportError:
     print("Please run: pip install python-dotenv")
     sys.exit()
 
+# --- NAYE IMPORTS (NEW IMPORTS) ---
+import google.generativeai as genai
+from PIL import Image
+import io
+import base64
+
 # --- 2. Import required libraries ---
 try:
     from groq import Groq  # <-- Native Groq client
@@ -22,6 +28,17 @@ except ImportError:
     print("Error: Required libraries not found.")
     print("Please run: pip install -U groq langchain-community langchain-text-splitters faiss-cpu sentence-transformers")
     sys.exit()
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+# Gemini (Vision) Model
+try:
+    genai.configure(api_key=GOOGLE_API_KEY)
+    vision_model = genai.GenerativeModel('gemini-2.5-flash')
+    print("Gemini Vision Model initialized successfully.")
+except Exception as e:
+    print(f"Error initializing Gemini Vision: {e}")
+    sys.exit(1)
 
 # --- 3. Load the API Key and Initialize Groq Client ---
 API_KEY = os.getenv("GROQ_API_KEY")
@@ -160,6 +177,61 @@ def get_feroze_response(user_question: str, retriever, chat_history_str: str) ->
         print(f"\nGroq API An error occurred: {e}")
         return "An internal error occurred while generating the AI response."
 
+
+# --- 6. Vision + RAG Function (Naya function) ---
+def get_consult_response(question: str, base64_image: str, retriever, history: str) -> str:
+    """
+    Generates a response using RAG context, chat history, AND an image.
+    """
+    print("Processing consultation with text and image...")
+
+    # --- 1. Image ko process karein ---
+    try:
+        # Base64 string se data header hatayein (jaise "data:image/jpeg;base64,")
+        image_data = base64.b64decode(base64_image.split(',')[1])
+        # Image ko PIL format mein open karein
+        img = Image.open(io.BytesIO(image_data))
+    except Exception as e:
+        print(f"Error processing image: {e}")
+        return "I'm sorry, I couldn't understand the screenshot you sent. Please try again."
+
+    # --- 2. RAG Context Haasil Karein ---
+    print("Fetching RAG context for vision query...")
+    context_docs = retriever.invoke(question)
+    context = "\n\n".join([doc.page_content for doc in context_docs])
+
+    # --- 3. Gemini Vision ke liye Prompt Banayein ---
+    prompt_parts = [
+        "You are Feroze Azeez AI, a world-class financial advisor.",
+        "Analyze the user's question and the provided screenshot. Use the 'Financial Context' to form your answer.",
+        "Be concise, professional, and helpful.",
+        "---",
+        "USER'S QUESTION:",
+        question,
+        "---",
+        "PREVIOUS CHAT HISTORY:",
+        history,
+        "---",
+        "FINANCIAL CONTEXT (From Knowledge Base):",
+        context,
+        "---",
+        "SCREENSHOT:",
+        img, # Yahan hum PIL image object pass kar rahe hain
+        "---",
+        "Based on all this information, provide your expert financial advice:"
+    ]
+
+    # --- 4. Gemini Vision ko Call Karein ---
+    print("Calling Gemini Vision API...")
+    try:
+        response = vision_model.generate_content(prompt_parts)
+        response_text = response.text
+        print("Successfully got response from Gemini Vision.")
+    except Exception as e:
+        print(f"Error calling Gemini Vision: {e}")
+        response_text = "I'm sorry, I encountered an error analyzing the screen. Please ask again."
+
+    return response_text # <-- ✅ ERROR 3 FIX: Jawab ko return kiya
 
 
 # # --- 8. Start the Chat Loop ---

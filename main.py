@@ -25,7 +25,7 @@ JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 # Assume rag_core is in the same directory
 try:
-    from rag_model import load_knowledge_base, get_feroze_response
+    from rag_model import load_knowledge_base, get_feroze_response, get_consult_response
 except ImportError:
     print("Error: Could not import functions from rag_core.py.")
     print("Please ensure rag_core.py is in the same folder.")
@@ -49,6 +49,7 @@ CHAT_HISTORY_LIMIT = 10 # Aakhiri 10 messages yaad rakhega
 origins = [
     # Aapka React app jis address par chalta hai
     "http://localhost:8080",
+    "http://localhost:5173",  # <-- ISE ADD KAREIN
     "http://localhost:3000", 
     "http://127.0.0.1:3000",
     # Agar aap Lovable ke preview URL se test kar rahe hain
@@ -62,7 +63,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     # --- THIS LINE IS THE FIX ---
-    allow_headers=["*","Authorization"],
+    allow_headers=["*"],
 )
 
 # --- 3. Knowledge Base Loading ---
@@ -99,6 +100,13 @@ class ChatRequest(BaseModel):
 # Front end ko kaisa data waapis bhejna hai
 class ChatResponse(BaseModel):
     answer: str
+
+
+# --- YEH NAYI CLASS ADD KAREIN ---
+class ConsultRequest(BaseModel):
+    question: str 
+    screenshot: str # Yeh Base64 image string receive karega
+# ----------------------------------
 
 
 
@@ -335,6 +343,50 @@ async def chat_endpoint(
     
     # Response JSON format mein waapis bhejein
     return ChatResponse(answer=response_text)
+
+
+@app.post("/api/consult", response_model=ChatResponse)
+async def consult_endpoint(
+    request: ConsultRequest, 
+    current_user: str = Depends(get_current_user)
+):
+    """
+   Handles the RAG process for a question AND a screenshot.
+   """
+    user_question = request.question
+    user_screenshot_base64 = request.screenshot # Naya data
+ 
+    print(f"--> Received question AND screenshot from: {current_user}")
+
+# 1. User ki puraani history nikaalein
+    user_history = chat_histories.get(current_user, [])
+
+# 2. History ko prompt ke liye format karein
+    history_str = format_history_for_prompt(user_history)
+
+# 3. NAYE RAG function ko call karein (jo image bhi leta hai)
+    try:
+        response_text = get_consult_response(
+            user_question, 
+            user_screenshot_base64, 
+            retriever, 
+            history_str
+            )
+    except Exception as e:
+     print(f"Error during vision consultation: {e}")
+     raise HTTPException(status_code=500, detail="Error processing image and question.")
+
+    # 4. Naye message ko history mein save karein
+    user_history.append({"role": "user", "content": user_question})
+    user_history.append({"role": "assistant", "content": response_text})
+
+    # 5. History ko update karein
+    chat_histories[current_user] = user_history[-CHAT_HISTORY_LIMIT:]
+
+    print(f"<-- Sending consult answer: {response_text}")
+
+    return ChatResponse(answer=response_text)
+
 
 # --- 7. Main Runner (Server Start) ---
 if __name__ == "__main__":

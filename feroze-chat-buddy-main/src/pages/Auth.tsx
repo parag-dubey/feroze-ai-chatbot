@@ -24,8 +24,8 @@ const Auth = () => {
 
     // Backend URL set karein
     const url = isLogin 
-      ? "http://localhost:8000/login" 
-      : "http://localhost:8000/register";
+      ? "http://localhost:8000/login"
+      : "http://localhost:8000/register";
     
     // Backend ko bheja jaane wala data
     const body = isLogin
